@@ -17,17 +17,26 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          pacman -Syu --noconfirm base-devel python python-build python-installer python-wheel python-setuptools-scm
+          pacman -Syu --noconfirm \
+            base-devel \
+            python \
+            python-build \
+            python-installer \
+            python-wheel \
+            python-setuptools-scm \
+            python-gnupg
 
       - name: Build Arch package
         run: |
           useradd -m builder
-          chown -R builder:builder .
-          cd /home/builder
-          sudo -u builder cp -r "$GITHUB_WORKSPACE" /home/builder/gpmaster
-          cd /home/builder/gpmaster
-          sudo -u builder makepkg --noconfirm -sf
-          cp *.pkg.tar.zst "$GITHUB_WORKSPACE/"
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+          su builder -c "
+            cd \"$GITHUB_WORKSPACE\"
+            makepkg --noconfirm -sf --nodeps
+          "
+
+          cp *.pkg.tar.zst /github/workspace/
 
       - name: Upload Arch package
         uses: actions/upload-artifact@v4
@@ -44,7 +53,16 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y debhelper dh-python python3-all python3-setuptools python3-build python3-installer python3-wheel devscripts
+          sudo apt-get install -y \
+            build-essential \
+            debhelper \
+            dh-python \
+            python3-all \
+            python3-setuptools \
+            python3-build \
+            python3-installer \
+            python3-wheel \
+            devscripts
 
       - name: Build Debian package
         run: |
@@ -63,9 +81,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Download Arch package
         uses: actions/download-artifact@v4
         with:
