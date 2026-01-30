@@ -7,6 +7,8 @@ A GPG-backed lockbox for secure secrets management with a custom binary format.
 - **Custom Binary Format (.gpb)**: Efficient storage with unencrypted metadata for fast operations
 - **GPG Encryption & Signing**: All secrets encrypted with GPG, with optional signature verification
 - **TOTP Support**: Store and generate TOTP codes for two-factor authentication
+- **Interactive TOTP Viewer**: Real-time TOTP code viewer with countdown timer
+- **Multiple Export Formats**: Dump secrets as list, JSON, or POSIX shell variables
 - **Minimal Dependencies**: Only requires `python-gnupg` and `pyotp`
 - **Environment Configuration**: Customize default paths via environment variables
 - **Retry Logic**: Smart retry for GPG operations when hardware tokens are unreliable
@@ -66,6 +68,23 @@ gpmaster get github_token
 
 # Generate TOTP code
 gpmaster get google_2fa --totp-code
+
+# Monitor a TOTP code
+gpmaster get -i google_2fa --totp-code
+
+```
+
+### Dump Secrets
+
+```bash
+# Dump all secrets in list format
+gpmaster dump
+
+# Dump as JSON
+gpmaster dump --format json
+
+# Dump as POSIX shell variables (for eval)
+gpmaster dump --format sh
 ```
 
 ### Show Lockbox Info
@@ -111,13 +130,14 @@ gpmaster rekey NEW_KEY_ID
 
 - `create KEY_ID`: Create a new lockbox
 - `add NAME [--totp] [--key-id KEY]`: Add a secret
-- `get NAME [--totp-code]`: Retrieve a secret
+- `get NAME [--totp-code] [-i]`: Retrieve a secret
 - `rename OLD NEW`: Rename a secret
 - `delete NAME`: Delete a secret
 - `info`: Show lockbox info and verify note signature
 - `note`: Edit notes document with $EDITOR (signed)
 - `validate`: Validate lockbox integrity and signature
 - `rekey NEW_KEY_ID`: Change encryption key
+- `dump [--format {list,json,sh}]`: Dump all secrets in various formats
 
 ## Binary Format
 

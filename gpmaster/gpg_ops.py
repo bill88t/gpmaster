@@ -14,19 +14,49 @@ class GPGOperations:
         self.gpg = gnupg.GPG()
         self.quiet = quiet
 
-    def encrypt(self, data: bytes, key_id: str) -> Tuple[bool, Optional[bytes]]:
+    def encrypt(
+        self, data: bytes, key_id: str, retry: bool = True
+    ) -> Tuple[bool, Optional[bytes]]:
         """Encrypt data for the specified key."""
-        result = self.gpg.encrypt(data, key_id, always_trust=False, armor=False)
-        if result.ok:
-            return True, bytes(result.data)
-        return False, None
+        while True:
+            result = self.gpg.encrypt(data, key_id, always_trust=False, armor=False)
+            if result.ok:
+                return True, bytes(result.data)
 
-    def decrypt(self, data: bytes) -> Tuple[bool, Optional[bytes], Optional[str]]:
+            if not retry or self.quiet:
+                return False, None
+
+            print(f"Encryption failed: {result.status}", file=sys.stderr)
+            try:
+                response = input(
+                    "Retry encryption? (Enter to retry, Ctrl+C to abort): "
+                ).strip()
+                continue
+            except KeyboardInterrupt:
+                print("\nAborted", file=sys.stderr)
+                return False, None
+
+    def decrypt(
+        self, data: bytes, retry: bool = True
+    ) -> Tuple[bool, Optional[bytes], Optional[str]]:
         """Decrypt data and return key ID used."""
-        result = self.gpg.decrypt(data)
-        if result.ok:
-            return True, bytes(result.data), result.key_id
-        return False, None, None
+        while True:
+            result = self.gpg.decrypt(data)
+            if result.ok:
+                return True, bytes(result.data), result.key_id
+
+            if not retry or self.quiet:
+                return False, None, None
+
+            print(f"Decryption failed: {result.status}", file=sys.stderr)
+            try:
+                response = input(
+                    "Retry decryption? (Enter to retry, Ctrl+C to abort): "
+                ).strip()
+                continue
+            except KeyboardInterrupt:
+                print("\nAborted", file=sys.stderr)
+                return False, None, None
 
     def sign(
         self, data: bytes, key_id: str, retry: bool = True
@@ -38,15 +68,17 @@ class GPGOperations:
             if result.data:
                 return True, bytes(result.data)
 
-            if not retry:
+            if not retry or self.quiet:
                 return False, None
 
-            if not self.quiet:
-                print(f"Signing failed: {result.status}", file=sys.stderr)
-                response = input("Retry signing? [Y/n]: ").strip().lower()
-                if response and response != "y":
-                    return False, None
-            else:
+            print(f"Signing failed: {result.status}", file=sys.stderr)
+            try:
+                response = input(
+                    "Retry signing? (Enter to retry, Ctrl+C to abort): "
+                ).strip()
+                continue
+            except KeyboardInterrupt:
+                print("\nAborted", file=sys.stderr)
                 return False, None
 
     def verify(self, data: bytes, signature: bytes) -> Tuple[bool, Optional[str]]:

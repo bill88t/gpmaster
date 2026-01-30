@@ -35,10 +35,10 @@ class Lockbox:
         return LockboxFormat.unpack(data)
 
     def _decrypt_data(
-        self, fmt: LockboxFormat
+        self, fmt: LockboxFormat, retry: bool = True
     ) -> Tuple[bool, Optional[Dict], Optional[str]]:
         """Decrypt lockbox data."""
-        success, decrypted, key_id = self.gpg.decrypt(fmt.encrypted_data)
+        success, decrypted, key_id = self.gpg.decrypt(fmt.encrypted_data, retry=retry)
         if not success:
             return False, None, None
 
@@ -64,7 +64,7 @@ class Lockbox:
         secrets = {}
         secrets_json = json.dumps(secrets, separators=(",", ":")).encode("utf-8")
 
-        success, encrypted = self.gpg.encrypt(secrets_json, key_id)
+        success, encrypted = self.gpg.encrypt(secrets_json, key_id, retry=False)
         if not success:
             raise RuntimeError("Failed to encrypt lockbox")
 
@@ -135,7 +135,7 @@ class Lockbox:
         """Add or update a secret in the lockbox."""
         if self.path.exists():
             fmt = self._load_format()
-            success, secrets, dec_key = self._decrypt_data(fmt)
+            success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
             if not success:
                 raise RuntimeError("Failed to decrypt lockbox")
 
@@ -164,7 +164,9 @@ class Lockbox:
             fmt.titles.append(name)
 
         secrets_json = json.dumps(secrets, separators=(",", ":")).encode("utf-8")
-        success, encrypted = self.gpg.encrypt(secrets_json, fmt.key_id)
+        success, encrypted = self.gpg.encrypt(
+            secrets_json, fmt.key_id, retry=not self.quiet
+        )
         if not success:
             raise RuntimeError("Failed to encrypt lockbox")
 
@@ -187,7 +189,7 @@ class Lockbox:
         if not self.quiet:
             print(f"Encrypted with key: {fmt.key_id}")
 
-        success, secrets, dec_key = self._decrypt_data(fmt)
+        success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
             raise RuntimeError("Failed to decrypt lockbox")
 
@@ -204,7 +206,7 @@ class Lockbox:
     def rename_secret(self, old_name: str, new_name: str):
         """Rename a secret."""
         fmt = self._load_format()
-        success, secrets, dec_key = self._decrypt_data(fmt)
+        success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
             raise RuntimeError("Failed to decrypt lockbox")
 
@@ -224,7 +226,9 @@ class Lockbox:
             fmt.titles[idx] = new_name
 
         secrets_json = json.dumps(secrets, separators=(",", ":")).encode("utf-8")
-        success, encrypted = self.gpg.encrypt(secrets_json, fmt.key_id)
+        success, encrypted = self.gpg.encrypt(
+            secrets_json, fmt.key_id, retry=not self.quiet
+        )
         if not success:
             raise RuntimeError("Failed to encrypt lockbox")
 
@@ -243,7 +247,7 @@ class Lockbox:
     def delete_secret(self, name: str):
         """Delete a secret."""
         fmt = self._load_format()
-        success, secrets, dec_key = self._decrypt_data(fmt)
+        success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
             raise RuntimeError("Failed to decrypt lockbox")
 
@@ -259,7 +263,9 @@ class Lockbox:
             fmt.titles.remove(name)
 
         secrets_json = json.dumps(secrets, separators=(",", ":")).encode("utf-8")
-        success, encrypted = self.gpg.encrypt(secrets_json, fmt.key_id)
+        success, encrypted = self.gpg.encrypt(
+            secrets_json, fmt.key_id, retry=not self.quiet
+        )
         if not success:
             raise RuntimeError("Failed to encrypt lockbox")
 
@@ -334,7 +340,7 @@ class Lockbox:
         if not self.quiet:
             print(f"Current key: {fmt.key_id}")
 
-        success, secrets, dec_key = self._decrypt_data(fmt)
+        success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
             raise RuntimeError("Failed to decrypt lockbox")
 
@@ -343,7 +349,9 @@ class Lockbox:
             print(f"Re-encrypting with key: {new_key_id}")
 
         secrets_json = json.dumps(secrets, separators=(",", ":")).encode("utf-8")
-        success, encrypted = self.gpg.encrypt(secrets_json, new_key_id)
+        success, encrypted = self.gpg.encrypt(
+            secrets_json, new_key_id, retry=not self.quiet
+        )
         if not success:
             raise RuntimeError("Failed to encrypt with new key")
 
@@ -361,3 +369,23 @@ class Lockbox:
 
         if not self.quiet:
             print(f"Lockbox re-keyed to: {new_key_id}")
+
+    def dump_secrets(self, format: str = "list") -> Dict:
+        """Dump all secrets (non-TOTP form)."""
+        fmt = self._load_format()
+
+        if not self.quiet:
+            print(f"Encrypted with key: {fmt.key_id}", file=sys.stderr)
+
+        success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
+        if not success:
+            raise RuntimeError("Failed to decrypt lockbox")
+
+        if not self.quiet:
+            print(f"Decrypted with key: {dec_key}", file=sys.stderr)
+
+        result = {}
+        for name, entry in secrets.items():
+            result[name] = entry["value"]
+
+        return result

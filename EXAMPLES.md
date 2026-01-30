@@ -138,6 +138,9 @@ gpmaster add discord_2fa --totp
 # Generate codes on demand
 gpmaster get github_2fa --totp-code
 
+# Interactive TOTP viewer (shows all TOTP codes with timer)
+gpmaster get -i github_2fa
+
 # Login automation example
 #!/bin/bash
 USERNAME="myuser"
@@ -146,6 +149,34 @@ TOTP=$(gpmaster get github_2fa --totp-code)
 
 echo "Logging in..."
 # Use these credentials with your automation tool
+```
+
+### Dumping Secrets
+
+```bash
+# List all secrets (default format)
+gpmaster dump
+# Output:
+# github_password: MySecurePassword123
+# api_key: sk_live_1234567890abcdef
+
+# Export as JSON
+gpmaster dump --format json
+# Output:
+# {
+#   "github_password": "MySecurePassword123",
+#   "api_key": "sk_live_1234567890abcdef"
+# }
+
+# Export as shell variables
+gpmaster dump --format sh
+# Output:
+# GITHUB_PASSWORD='MySecurePassword123'
+# API_KEY='sk_live_1234567890abcdef'
+
+# Eval into shell (be careful!)
+eval $(gpmaster -q dump --format sh)
+echo $API_KEY  # Now available as shell variable
 ```
 
 ## Integration Examples
@@ -192,6 +223,12 @@ STRIPE_KEY=$(gpmaster -q get stripe_test_key)
 TWILIO_SID=$(gpmaster -q get twilio_sid)
 TWILIO_AUTH=$(gpmaster -q get twilio_auth_token)
 EOF
+
+# Or use dump to generate .env file
+gpmaster -q dump --format sh > .env
+
+# Load into current shell
+eval $(gpmaster -q dump --format sh)
 ```
 
 ### Backup and Restore
@@ -235,8 +272,8 @@ gpmaster note  # Edit notes to add audit information
 
 ```bash
 # GPG card/token failures
-# gpmaster will automatically prompt to retry
-# Just try again when it fails
+# gpmaster will automatically prompt to retry on failures
+# Press Enter to retry, or Ctrl+C to abort
 
 # Force validation
 gpmaster validate
@@ -262,10 +299,14 @@ alias gpget='gpmaster get'
 alias gpadd='gpmaster add'
 alias gpinfo='gpmaster info'
 alias gpval='gpmaster validate'
+alias gpdump='gpmaster dump'
 
 # Get and copy to clipboard
 alias gpc='gpmaster get "$1" | xclip -selection clipboard'
 
 # TOTP shortcut
 alias gpotp='gpmaster get "$1" --totp-code'
+
+# Load all secrets into shell
+alias gpload='eval $(gpmaster -q dump --format sh)'
 ```

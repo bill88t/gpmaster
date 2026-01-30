@@ -1,6 +1,11 @@
 import argparse
+import json
 import os
 import sys
+import time
+import termios
+import tty
+import select
 from pathlib import Path
 
 from .lockbox import Lockbox
@@ -19,6 +24,63 @@ def get_default_lockbox_path() -> str:
     if env_path:
         return os.path.expanduser(env_path)
     return str(Path.home() / ".local" / "state" / "gpmaster.gpb")
+
+
+def interactive_totp_viewer(lockbox, quiet):
+    """Interactive TOTP viewer with timer."""
+    secrets = lockbox.dump_secrets()
+
+    totp_secrets = {}
+    for name, value in secrets.items():
+        try:
+            totp = pyotp.TOTP(value)
+            totp_secrets[name] = totp
+        except Exception:
+            pass
+
+    if not totp_secrets:
+        print("No valid TOTP secrets found", file=sys.stderr)
+        return
+
+    old_settings = termios.tcgetattr(sys.stdin)
+    try:
+        tty.setcbreak(sys.stdin.fileno())
+
+        print("\033[2J\033[H", end="", flush=True)
+        print("Interactive TOTP Viewer - Press any key to exit\n")
+
+        last_code_time = 0
+        while True:
+            current_time = time.time()
+            totp_period = 30
+            remaining = totp_period - (int(current_time) % totp_period)
+
+            codes_changed = int(current_time) // totp_period != last_code_time
+            if codes_changed:
+                print("\033[H", end="", flush=True)
+                print("Interactive TOTP Viewer - Press any key to exit")
+                print(f"Time remaining: {remaining}s")
+
+                for name, totp in totp_secrets.items():
+                    code = totp.now()
+                    print(f"\n{name}: {code}")
+
+                last_code_time = int(current_time) // totp_period
+            else:
+                print(f"\033[2;0HTime remaining: {remaining}s", end="", flush=True)
+
+            if select.select([sys.stdin], [], [], 0.1)[0]:
+                sys.stdin.read(1)
+                print("\033[2J\033[H", end="", flush=True)
+                break
+
+            time.sleep(0.1)
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+        print("\033[2J\033[H", end="", flush=True)
 
 
 def main():
@@ -51,6 +113,12 @@ def main():
     get_parser.add_argument(
         "--totp-code", action="store_true", help="Generate TOTP code"
     )
+    get_parser.add_argument(
+        "-i",
+        "--interactive",
+        action="store_true",
+        help="Interactive TOTP viewer (shows timer and cycling codes)",
+    )
 
     rename_parser = subparsers.add_parser("rename", help="Rename a secret")
     rename_parser.add_argument("old_name", help="Current secret name")
@@ -67,6 +135,15 @@ def main():
 
     rekey_parser = subparsers.add_parser("rekey", help="Change encryption key")
     rekey_parser.add_argument("new_key_id", help="New GPG key ID")
+
+    dump_parser = subparsers.add_parser("dump", help="Dump all secrets")
+    dump_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["list", "json", "sh"],
+        default="list",
+        help="Output format (default: list)",
+    )
 
     args = parser.parse_args()
 
@@ -112,7 +189,21 @@ def main():
                 print(f"Secret not found: {args.name}", file=sys.stderr)
                 return 1
 
-            if args.totp_code or is_totp:
+            if args.interactive:
+                if not TOTP_AVAILABLE:
+                    print("Error: pyotp not installed", file=sys.stderr)
+                    return 1
+                if not is_totp:
+                    print(f"Error: {args.name} is not a TOTP secret", file=sys.stderr)
+                    return 1
+
+                # Create a temporary lockbox dict with just this secret
+                temp_secrets = {args.name: secret}
+                old_dump = lockbox.dump_secrets
+                lockbox.dump_secrets = lambda: temp_secrets
+                interactive_totp_viewer(lockbox, args.quiet)
+                lockbox.dump_secrets = old_dump
+            elif args.totp_code or is_totp:
                 if not TOTP_AVAILABLE:
                     print("Error: pyotp not installed", file=sys.stderr)
                     return 1
@@ -168,6 +259,24 @@ def main():
 
         elif args.command == "rekey":
             lockbox.rekey(args.new_key_id)
+
+        elif args.command == "dump":
+            secrets = lockbox.dump_secrets()
+            if args.format == "list":
+                for name, value in secrets.items():
+                    print(f"{name}: {value}")
+            elif args.format == "json":
+                print(json.dumps(secrets, indent=2))
+            elif args.format == "sh":
+                for name, value in secrets.items():
+                    safe_name = (
+                        name.replace("-", "_")
+                        .replace(".", "_")
+                        .replace(" ", "_")
+                        .upper()
+                    )
+                    safe_value = value.replace("'", "'\\''")
+                    print(f"{safe_name}='{safe_value}'")
 
         return 0
 
