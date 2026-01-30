@@ -149,7 +149,3 @@ This design allows listing contents and viewing metadata without decryption.
 - python-gnupg
 - pyotp
 - GnuPG
-
-## License
-
-MIT License - See debian/copyright for details
