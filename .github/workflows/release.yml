@@ -7,6 +7,29 @@ on:
       - '[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - name: Install build & twine
+        run: |
+          pip install --upgrade build twine
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: Upload to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m twine upload dist/*
+
   build-arch:
     runs-on: ubuntu-latest
     container:
@@ -94,6 +117,7 @@ jobs:
             dh-python \
             python3-all \
             python3-setuptools \
+            python3-setuptools-scm \
             python3-build \
             python3-installer \
             python3-wheel \

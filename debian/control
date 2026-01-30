@@ -1,18 +1,19 @@
 Source: gpmaster
 Section: utils
 Priority: optional
-Maintainer: Your Name <your.email@example.com>
+Maintainer: Bill Sideris <bill88t@feline.gr>
 Build-Depends: debhelper-compat (= 13),
                dh-python,
                python3-all,
                python3-setuptools,
+               python3-setuptools-scm,
                python3-build,
                python3-installer,
                python3-wheel
 Standards-Version: 4.6.0
-Homepage: https://github.com/yourusername/gpmaster
-Vcs-Browser: https://github.com/yourusername/gpmaster
-Vcs-Git: https://github.com/yourusername/gpmaster.git
+Homepage: https://github.com/bill88t/gpmaster
+Vcs-Browser: https://github.com/bill88t/gpmaster
+Vcs-Git: https://github.com/bill88t/gpmaster.git
 
 Package: gpmaster
 Architecture: all
