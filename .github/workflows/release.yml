@@ -36,7 +36,7 @@ jobs:
             makepkg --noconfirm -sf --nodeps
           "
 
-          cp *.pkg.tar.zst /github/workspace/
+          cp -t \"$GITHUB_WORKSPACE\" *.pkg.tar.zst
 
       - name: Upload Arch package
         uses: actions/upload-artifact@v4
@@ -55,6 +55,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
+            debhelper-compat \
             debhelper \
             dh-python \
             python3-all \
