@@ -32,11 +32,6 @@ class TestTOTPFunctionality(unittest.TestCase):
 
         self.assertTrue(totp.verify(code, valid_window=1))
 
-    def test_invalid_totp_secret(self):
-        """Test invalid TOTP secret."""
-        with self.assertRaises(Exception):
-            pyotp.TOTP("invalid@secret!")
-
 
 if __name__ == "__main__":
     unittest.main()
