@@ -17,11 +17,15 @@ build() {
     cp -r "$srcdir/../pyproject.toml" "$srcdir/"
     cp -r "$srcdir/../README.md" "$srcdir/"
     cp -r "$srcdir/../setup.py" "$srcdir/"
+    cp "$srcdir/../gpmaster-completion.bash" "$srcdir/"
     python -m build --wheel --no-isolation
 }
 
 package() {
     python -m installer --destdir="$pkgdir" dist/*.whl
+
+    # Install bash completion
+    install -Dm644 gpmaster-completion.bash "$pkgdir/usr/share/bash-completion/completions/gpmaster"
 
     # Install license if available
     if [ -f LICENSE ]; then

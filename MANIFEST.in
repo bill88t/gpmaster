@@ -2,5 +2,6 @@ include README.md
 include LICENSE
 include requirements.txt
 include pyproject.toml
+include gpmaster-completion.bash
 recursive-include gpmaster *.py
 recursive-include tests *.py
