@@ -29,9 +29,26 @@ jobs:
       - name: Prepare builder user and workspace copy
         run: |
           useradd -m builder || true
-          # Copy workspace to builder-owned location to avoid permission/sudo issues
+
+          # prefer GITHUB_WORKSPACE, fall back to runner paths if container mount differs
+          WORKSPACE="${GITHUB_WORKSPACE:-/github/workspace}"
+          if [ ! -d "$WORKSPACE" ]; then
+            if [ -d "/__w/${GITHUB_REPOSITORY}" ]; then
+              WORKSPACE="/__w/${GITHUB_REPOSITORY}"
+            else
+              WORKSPACE=$(ls -d /__w/*/* 2>/dev/null | head -n1 || true)
+            fi
+          fi
+
+          if [ -z "$WORKSPACE" ] || [ ! -d "$WORKSPACE" ]; then
+            echo "Cannot find workspace (tried \$GITHUB_WORKSPACE, /github/workspace, /__w/*/*)."
+            ls -la / || true
+            exit 1
+          fi
+
+          echo "Using workspace: $WORKSPACE"
           rm -rf /home/builder/gpmaster
-          cp -r /github/workspace /home/builder/gpmaster
+          cp -r "$WORKSPACE" /home/builder/gpmaster
           chown -R builder:builder /home/builder/gpmaster
 
       - name: Build Arch package as builder
@@ -40,8 +57,20 @@ jobs:
 
       - name: Copy Arch package back to workspace
         run: |
-          # Copy built package(s) into the Actions workspace so upload-artifact can find them
-          cp -v /home/builder/gpmaster/*.pkg.tar.zst /github/workspace/
+          # Compute workspace again (same fallback)
+          WORKSPACE="${GITHUB_WORKSPACE:-/github/workspace}"
+          if [ ! -d "$WORKSPACE" ]; then
+            if [ -d "/__w/${GITHUB_REPOSITORY}" ]; then
+              WORKSPACE="/__w/${GITHUB_REPOSITORY}"
+            else
+              WORKSPACE=$(ls -d /__w/*/* 2>/dev/null | head -n1 || true)
+            fi
+          fi
+          if [ -z "$WORKSPACE" ] || [ ! -d "$WORKSPACE" ]; then
+            echo "Cannot find workspace to copy artifacts into."
+            exit 1
+          fi
+          cp -v /home/builder/gpmaster/*.pkg.tar.zst "$WORKSPACE"/
 
       - name: Upload Arch package
         uses: actions/upload-artifact@v4
@@ -55,7 +84,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install build & test dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -68,6 +97,8 @@ jobs:
             python3-build \
             python3-installer \
             python3-wheel \
+            python3-gnupg \
+            python3-pyotp \
             devscripts
 
       - name: Remove debian/compat if present (CI-safe)
