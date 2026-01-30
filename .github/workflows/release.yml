@@ -1,0 +1,88 @@
+name: Build and Draft Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  build-arch:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm base-devel python python-build python-installer python-wheel python-setuptools-scm
+
+      - name: Build Arch package
+        run: |
+          useradd -m builder
+          chown -R builder:builder .
+          cd /home/builder
+          sudo -u builder cp -r "$GITHUB_WORKSPACE" /home/builder/gpmaster
+          cd /home/builder/gpmaster
+          sudo -u builder makepkg --noconfirm -sf
+          cp *.pkg.tar.zst "$GITHUB_WORKSPACE/"
+
+      - name: Upload Arch package
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-package
+          path: '*.pkg.tar.zst'
+
+  build-debian:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y debhelper dh-python python3-all python3-setuptools python3-build python3-installer python3-wheel devscripts
+
+      - name: Build Debian package
+        run: |
+          dpkg-buildpackage -us -uc -b
+          mv ../*.deb .
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path: '*.deb'
+
+  create-release:
+    needs: [build-arch, build-debian]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Arch package
+        uses: actions/download-artifact@v4
+        with:
+          name: arch-package
+
+      - name: Download Debian package
+        uses: actions/download-artifact@v4
+        with:
+          name: debian-package
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          files: |
+            *.pkg.tar.zst
+            *.deb
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

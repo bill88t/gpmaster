@@ -1,0 +1,34 @@
+Source: gpmaster
+Section: utils
+Priority: optional
+Maintainer: Your Name <your.email@example.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all,
+               python3-setuptools,
+               python3-build,
+               python3-installer,
+               python3-wheel
+Standards-Version: 4.6.0
+Homepage: https://github.com/yourusername/gpmaster
+Vcs-Browser: https://github.com/yourusername/gpmaster
+Vcs-Git: https://github.com/yourusername/gpmaster.git
+
+Package: gpmaster
+Architecture: all
+Depends: ${python3:Depends},
+         ${misc:Depends},
+         python3-gnupg,
+         python3-pyotp,
+         gnupg
+Description: GPG-backed lockbox for secrets management
+ GPMaster is a command-line tool for managing secrets in a GPG-encrypted
+ lockbox. It provides a custom binary format with unencrypted metadata
+ for efficient operations and supports TOTP secrets.
+ .
+ Features:
+  - Custom binary format with integrity checking
+  - GPG encryption and signing
+  - TOTP secret support
+  - Minimal dependencies
+  - Environment variable configuration
