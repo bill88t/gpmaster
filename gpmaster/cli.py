@@ -153,11 +153,11 @@ def main():
                         data_to_verify, note_signature
                     )
                     if valid:
-                        print(f"\nNote signature valid (signed by: {signer_key})")
+                        print(f"Note signature valid (signed by: {signer_key})")
                     else:
-                        print(f"\nNote signature INVALID")
+                        print(f"Note signature INVALID")
                 else:
-                    print(f"\nNote present but not signed")
+                    print(f"Note present but not signed")
 
         elif args.command == "note":
             lockbox.edit_note()
