@@ -26,17 +26,22 @@ jobs:
             python-setuptools-scm \
             python-gnupg
 
-      - name: Build Arch package
+      - name: Prepare builder user and workspace copy
         run: |
-          useradd -m builder
-          chown -R builder:builder "$GITHUB_WORKSPACE"
+          useradd -m builder || true
+          # Copy workspace to builder-owned location to avoid permission/sudo issues
+          rm -rf /home/builder/gpmaster
+          cp -r /github/workspace /home/builder/gpmaster
+          chown -R builder:builder /home/builder/gpmaster
 
-          su builder -c "
-            cd \"$GITHUB_WORKSPACE\"
-            makepkg --noconfirm -sf --nodeps
-          "
+      - name: Build Arch package as builder
+        run: |
+          su -s /bin/bash - builder -c 'cd /home/builder/gpmaster && makepkg --noconfirm -sf --nodeps'
 
-          cp -t \"$GITHUB_WORKSPACE\" *.pkg.tar.zst
+      - name: Copy Arch package back to workspace
+        run: |
+          # Copy built package(s) into the Actions workspace so upload-artifact can find them
+          cp -v /home/builder/gpmaster/*.pkg.tar.zst /github/workspace/
 
       - name: Upload Arch package
         uses: actions/upload-artifact@v4
@@ -64,6 +69,13 @@ jobs:
             python3-installer \
             python3-wheel \
             devscripts
+
+      - name: Remove debian/compat if present (CI-safe)
+        run: |
+          if [ -f debian/compat ]; then
+            echo "Removing debian/compat to avoid duplicate debhelper compat declarations."
+            rm debian/compat
+          fi
 
       - name: Build Debian package
         run: |
