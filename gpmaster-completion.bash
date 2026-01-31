@@ -5,7 +5,7 @@ _gpmaster() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="create add get rename delete info note validate rekey"
+    local commands="create add get rename delete dump info note validate rekey"
     local global_opts="-l --lockbox -q --quiet -h --help"
 
     # If we're at the first argument position (after gpmaster)
@@ -24,7 +24,7 @@ _gpmaster() {
                 ;;
             -q|--quiet)
                 ;;
-            create|add|get|rename|delete|info|note|validate|rekey)
+            create|add|get|rename|delete|dump|info|note|validate|rekey)
                 cmd="${words[i]}"
                 break
                 ;;
@@ -106,7 +106,7 @@ _gpmaster() {
 # Helper function to complete secret names from the lockbox
 _gpmaster_complete_secrets() {
     local lockbox_path="${GPMASTER_LOCKBOX_PATH:-$HOME/.local/state/gpmaster.gpb}"
-    
+
     # Check if --lockbox option was specified
     local i
     for ((i=1; i < cword; i++)); do

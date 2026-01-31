@@ -1,6 +1,6 @@
 # Maintainer: Bill Sideris <bill88t@feline.gr>
 pkgname=gpmaster
-pkgver=1.1.0
+pkgver=1.1.2
 pkgrel=1
 pkgdesc="GPG-backed lockbox for secrets management"
 arch=('any')
