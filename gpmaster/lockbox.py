@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import subprocess
+import base64
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -389,3 +390,167 @@ class Lockbox:
             result[name] = entry["value"]
 
         return result
+
+    def _is_file_secret(self, name: str) -> bool:
+        """Check if a secret key represents a file."""
+        return name.startswith("_FILE_")
+
+    def _extract_filename(self, key: str) -> str:
+        """Extract original filename from file secret key."""
+        if self._is_file_secret(key):
+            return key[6:]  # Remove "_FILE_" prefix
+        return key
+
+    def add_file(
+        self,
+        file_path: str,
+        keep_source: bool = False,
+        auto_create_key: Optional[str] = None,
+    ):
+        """Add a file to the lockbox."""
+        file_path_obj = Path(file_path)
+        if not file_path_obj.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        filename = file_path_obj.name
+        secret_key = f"_FILE_{filename}"
+
+        with open(file_path, "rb") as f:
+            file_data = f.read()
+
+        file_data_b64 = base64.b64encode(file_data).decode("utf-8")
+
+        # Load or create lockbox
+        if self.path.exists():
+            fmt = self._load_format()
+            success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
+            if not success:
+                raise RuntimeError("Failed to decrypt lockbox")
+
+            if not self.quiet:
+                print(f"Decrypted with key: {dec_key}")
+        else:
+            if not auto_create_key:
+                raise FileNotFoundError(
+                    "Lockbox does not exist. Create it first with 'gpmaster create <key-id>' or set GPMASTER_KEY_ID environment variable."
+                )
+
+            if not self.quiet:
+                print(f"Creating new lockbox with key: {auto_create_key}")
+            self.create(auto_create_key)
+
+            fmt = self._load_format()
+            secrets = {}
+
+        entry = {"value": file_data_b64, "type": "file"}
+        secrets[secret_key] = entry
+
+        if secret_key not in fmt.titles:
+            fmt.titles.append(secret_key)
+
+        secrets_json = json.dumps(secrets, separators=(",", ":")).encode("utf-8")
+        success, encrypted = self.gpg.encrypt(
+            secrets_json, fmt.key_id, retry=not self.quiet
+        )
+        if not success:
+            raise RuntimeError("Failed to encrypt lockbox")
+
+        fmt.encrypted_data = encrypted
+
+        data_to_sign = fmt.key_id.encode("utf-8") + encrypted
+        success, signature = self.gpg.sign(data_to_sign, fmt.key_id, retry=True)
+        if success:
+            fmt.signature = signature
+
+        self._save_lockbox(fmt)
+
+        if not keep_source:
+            os.unlink(file_path)
+            if not self.quiet:
+                print(f"Added file: {filename} (source removed)")
+        else:
+            if not self.quiet:
+                print(f"Added file: {filename}")
+
+    def remove_file(self, filename: str):
+        """Remove a file from the lockbox."""
+        secret_key = f"_FILE_{filename}"
+
+        fmt = self._load_format()
+        success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
+        if not success:
+            raise RuntimeError("Failed to decrypt lockbox")
+
+        if not self.quiet:
+            print(f"Decrypted with key: {dec_key}")
+
+        if secret_key not in secrets:
+            raise KeyError(f"File not found: {filename}")
+
+        del secrets[secret_key]
+
+        if secret_key in fmt.titles:
+            fmt.titles.remove(secret_key)
+
+        secrets_json = json.dumps(secrets, separators=(",", ":")).encode("utf-8")
+        success, encrypted = self.gpg.encrypt(
+            secrets_json, fmt.key_id, retry=not self.quiet
+        )
+        if not success:
+            raise RuntimeError("Failed to encrypt lockbox")
+
+        fmt.encrypted_data = encrypted
+
+        data_to_sign = fmt.key_id.encode("utf-8") + encrypted
+        success, signature = self.gpg.sign(data_to_sign, fmt.key_id, retry=True)
+        if success:
+            fmt.signature = signature
+
+        self._save_lockbox(fmt)
+
+        if not self.quiet:
+            print(f"Deleted file: {filename}")
+
+    def list_files(self) -> List[str]:
+        """List all files in the lockbox."""
+        fmt = self._load_format()
+        files = [
+            self._extract_filename(title)
+            for title in fmt.titles
+            if self._is_file_secret(title)
+        ]
+        return files
+
+    def get_file(self, filename: str) -> Optional[bytes]:
+        """Retrieve file data from lockbox."""
+        secret_key = f"_FILE_{filename}"
+
+        fmt = self._load_format()
+
+        if not self.quiet:
+            print(f"Encrypted with key: {fmt.key_id}")
+
+        success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
+        if not success:
+            raise RuntimeError("Failed to decrypt lockbox")
+
+        if not self.quiet:
+            print(f"Decrypted with key: {dec_key}")
+
+        if secret_key not in secrets:
+            return None
+
+        entry = secrets[secret_key]
+        if entry.get("type") != "file":
+            return None
+
+        file_data_b64 = entry["value"]
+        return base64.b64decode(file_data_b64)
+
+    def get_file_list(self) -> List[str]:
+        """Get list of file keys for completion."""
+        try:
+            fmt = self._load_format()
+            return [title for title in fmt.titles if self._is_file_secret(title)]
+        except Exception:
+            return []

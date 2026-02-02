@@ -75,6 +75,32 @@ gpmaster note
 gpmaster validate
 ```
 
+### 5. File Operations
+
+```bash
+# Add a certificate file (removes source by default)
+gpmaster file add ~/certificates/server.crt
+
+# Add a file but keep the original
+gpmaster file add ~/documents/contract.pdf --keep-source
+
+# List all files in the vault
+gpmaster file list
+
+# Retrieve and save to specific location
+gpmaster file get server.crt --path /etc/ssl/certs/server.crt
+
+# Retrieve to temporary file
+gpmaster file get contract.pdf --tmp
+# Creates: /tmp/gpmaster.$UID.contract.pdf
+
+# Retrieve and output to stdout (binary)
+gpmaster file get certificate.pem --text > ~/certificate.pem
+
+# Remove a file from the vault
+gpmaster file remove old_certificate.pem
+```
+
 ## Advanced Usage
 
 ### Multiple Lockboxes
@@ -149,6 +175,31 @@ TOTP=$(gpmaster get github_2fa --totp-code)
 
 echo "Logging in..."
 # Use these credentials with your automation tool
+```
+
+### File Management Workflows
+
+```bash
+# Secure storage of SSL certificates
+gpmaster file add /etc/ssl/certs/domain.crt
+gpmaster file add /etc/ssl/private/domain.key
+
+# Store backup configs
+gpmaster file add ~/.ssh/config --keep-source
+gpmaster file add ~/.gitconfig --keep-source
+
+# Retrieve during deployment
+gpmaster file get domain.crt --path /etc/ssl/certs/domain.crt
+gpmaster file get domain.key --path /etc/ssl/private/domain.key
+
+# Retrieve for deployment scripts
+CERT_PATH=$(mktemp)
+gpmaster file get certificate.pem --path "$CERT_PATH"
+./deploy.sh "$CERT_PATH"
+rm "$CERT_PATH"
+
+# Check what files are stored
+gpmaster info  # Shows Files section separately from Secrets
 ```
 
 ### Dumping Secrets
@@ -231,6 +282,22 @@ gpmaster -q dump --format sh > .env
 eval $(gpmaster -q dump --format sh)
 ```
 
+### Certificate Management
+
+```bash
+# Store SSL certificates
+gpmaster file add /path/to/server.crt
+gpmaster file add /path/to/server.key
+
+# Backup and restore certificates
+gpmaster file list  # See what's stored
+
+# Retrieve during server setup
+gpmaster file get server.crt --path /etc/ssl/certs/
+gpmaster file get server.key --path /etc/ssl/private/
+chmod 600 /etc/ssl/private/server.key
+```
+
 ### Backup and Restore
 
 ```bash
@@ -263,8 +330,15 @@ fi
 # Secure your lockbox file permissions
 chmod 600 ~/.local/state/gpmaster.gpb
 
+# Secure retrieved files
+gpmaster file get sensitive.pdf --path /tmp/sensitive.pdf
+# Immediately process the file
+cat /tmp/sensitive.pdf | your_processor
+# Clean up
+shred -vfz /tmp/sensitive.pdf || rm /tmp/sensitive.pdf
+
 # Regular audits
-gpmaster info  # Review what secrets you have
+gpmaster info  # Review what secrets and files you have
 gpmaster note  # Edit notes to add audit information
 ```
 
@@ -281,11 +355,11 @@ gpmaster validate
 # Check what key is used
 gpmaster info  # Shows "Encrypted with key: KEY_ID"
 
-# Recreate corrupted lockbox (LOSES ALL SECRETS!)
+# Recreate corrupted lockbox (LOSES ALL SECRETS AND FILES!)
 # Make sure you have a backup first!
 rm ~/.local/state/gpmaster.gpb
 gpmaster create YOUR_KEY_ID
-# Re-add all secrets manually
+# Re-add all secrets and files manually
 ```
 
 ## Shell Aliases
@@ -300,6 +374,8 @@ alias gpadd='gpmaster add'
 alias gpinfo='gpmaster info'
 alias gpval='gpmaster validate'
 alias gpdump='gpmaster dump'
+alias gpfile='gpmaster file'
+alias gpflist='gpmaster file list'
 
 # Get and copy to clipboard
 alias gpc='gpmaster get "$1" | xclip -selection clipboard'
@@ -307,6 +383,12 @@ alias gpc='gpmaster get "$1" | xclip -selection clipboard'
 # TOTP shortcut
 alias gpotp='gpmaster get "$1" --totp-code'
 
+# File operations
+alias gpfget='gpmaster file get'
+alias gpfadd='gpmaster file add'
+alias gpfrm='gpmaster file remove'
+
 # Load all secrets into shell
 alias gpload='eval $(gpmaster -q dump --format sh)'
 ```
+

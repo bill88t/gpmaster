@@ -145,6 +145,39 @@ def main():
         help="Output format (default: list)",
     )
 
+    file_parser = subparsers.add_parser("file", help="File operations")
+    file_subparsers = file_parser.add_subparsers(
+        dest="file_command", help="File commands"
+    )
+
+    file_add_parser = file_subparsers.add_parser("add", help="Add a file to the vault")
+    file_add_parser.add_argument("path", help="Path to file to add")
+    file_add_parser.add_argument(
+        "--keep-source", action="store_true", help="Keep original file after adding"
+    )
+    file_add_parser.add_argument(
+        "--key-id", help="GPG key ID (for auto-creating lockbox)"
+    )
+
+    file_remove_parser = file_subparsers.add_parser(
+        "remove", help="Remove a file from the vault"
+    )
+    file_remove_parser.add_argument("filename", help="Filename to remove")
+
+    file_subparsers.add_parser("list", help="List all files in the vault")
+
+    file_get_parser = file_subparsers.add_parser(
+        "get", help="Retrieve a file from the vault"
+    )
+    file_get_parser.add_argument("filename", help="Filename to retrieve")
+    file_get_parser.add_argument(
+        "--text", action="store_true", help="Output as text to stdout"
+    )
+    file_get_parser.add_argument("--path", help="Save to specific file path")
+    file_get_parser.add_argument(
+        "--tmp", action="store_true", help="Save to tmpfile in /tmp"
+    )
+
     args = parser.parse_args()
 
     if args.quiet or os.environ.get("GPMASTER_QUIET"):
@@ -229,10 +262,21 @@ def main():
 
             if not args.quiet:
                 print(f"Lockbox encrypted with key: {key_id}")
-                print(f"\nSecrets ({len(titles)}):")
 
-            for title in titles:
-                print(f"  {title}")
+            # Separate files from secrets
+            files = [t for t in titles if t.startswith("_FILE_")]
+            secrets = [t for t in titles if not t.startswith("_FILE_")]
+
+            if not args.quiet and len(secrets) > 0:
+                print(f"\nSecrets ({len(secrets)}):")
+            for secret in secrets:
+                print(f"  {secret}")
+
+            if not args.quiet and len(files) > 0:
+                print(f"\nFiles ({len(files)}):")
+            for file_key in files:
+                filename = file_key[6:]  # Remove "_FILE_" prefix
+                print(f"  {filename}")
 
             if note_content is not None and not args.quiet:
                 print("\nNote:")
@@ -277,6 +321,62 @@ def main():
                     )
                     safe_value = value.replace("'", "'\\''")
                     print(f"{safe_name}='{safe_value}'")
+
+        elif args.command == "file":
+            if not args.file_command:
+                print(
+                    "Error: file subcommand required (add, remove, list, get)",
+                    file=sys.stderr,
+                )
+                return 1
+
+            if args.file_command == "add":
+                auto_key = args.key_id or os.environ.get("GPMASTER_KEY_ID")
+                lockbox.add_file(
+                    args.path, keep_source=args.keep_source, auto_create_key=auto_key
+                )
+
+            elif args.file_command == "remove":
+                lockbox.remove_file(args.filename)
+
+            elif args.file_command == "list":
+                files = lockbox.list_files()
+                if not args.quiet:
+                    print(f"Files in vault ({len(files)}):")
+                for filename in files:
+                    print(f"  {filename}")
+
+            elif args.file_command == "get":
+                file_data = lockbox.get_file(args.filename)
+
+                if file_data is None:
+                    print(f"File not found: {args.filename}", file=sys.stderr)
+                    return 1
+
+                if args.text:
+                    # Output as text
+                    sys.stdout.buffer.write(file_data)
+                elif args.path:
+                    # Save to specific path
+                    target_path = Path(args.path)
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(target_path, "wb") as f:
+                        f.write(file_data)
+                    if not args.quiet:
+                        print(f"File saved to: {args.path}")
+                elif args.tmp:
+                    # Save to tmpfile
+                    uid = os.getuid()
+                    tmpfile_path = f"/tmp/gpmaster.{uid}.{args.filename}"
+                    with open(tmpfile_path, "wb") as f:
+                        f.write(file_data)
+                    if not args.quiet:
+                        print(f"File saved to: {tmpfile_path}")
+                    else:
+                        print(tmpfile_path)
+                else:
+                    # Default: output as text to stdout
+                    sys.stdout.buffer.write(file_data)
 
         return 0
 

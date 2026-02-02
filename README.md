@@ -7,6 +7,7 @@ A GPG-backed lockbox for secure secrets management with a custom binary format.
 - **Custom Binary Format (.gpb)**: Efficient storage with unencrypted metadata for fast operations
 - **GPG Encryption & Signing**: All secrets encrypted with GPG, with optional signature verification
 - **TOTP Support**: Store and generate TOTP codes for two-factor authentication
+- **File Support**: Securely store and manage files in the vault with multiple retrieval options
 - **Interactive TOTP Viewer**: Real-time TOTP code viewer with countdown timer
 - **Multiple Export Formats**: Dump secrets as list, JSON, or POSIX shell variables
 - **Minimal Dependencies**: Only requires `python-gnupg` and `pyotp`
@@ -74,6 +75,31 @@ gpmaster get -i google_2fa --totp-code
 
 ```
 
+### File Operations
+
+```bash
+# Add a file to the vault (moves the file by default)
+gpmaster file add /path/to/document.pdf
+
+# Add a file but keep the original
+gpmaster file add /path/to/certificate.pem --keep-source
+
+# List all files in the vault
+gpmaster file list
+
+# Retrieve a file and save to specific path
+gpmaster file get document.pdf --path ~/Downloads/document.pdf
+
+# Retrieve a file to a tmpfile (/tmp/gpmaster.$UID.filename)
+gpmaster file get document.pdf --tmp
+
+# Retrieve a file and output to stdout (binary)
+gpmaster file get document.pdf --text
+
+# Remove a file from the vault
+gpmaster file remove document.pdf
+```
+
 ### Dump Secrets
 
 ```bash
@@ -90,7 +116,7 @@ gpmaster dump --format sh
 ### Show Lockbox Info
 
 ```bash
-# List all secrets and verify note signature
+# List all secrets and files, verify note signature
 gpmaster info
 ```
 
@@ -138,6 +164,10 @@ gpmaster rekey NEW_KEY_ID
 - `validate`: Validate lockbox integrity and signature
 - `rekey NEW_KEY_ID`: Change encryption key
 - `dump [--format {list,json,sh}]`: Dump all secrets in various formats
+- `file add PATH [--keep-source] [--key-id KEY]`: Add a file to the vault
+- `file remove FILENAME`: Remove a file from the vault
+- `file list`: List all files in the vault
+- `file get FILENAME [--text|--path PATH|--tmp]`: Retrieve a file
 
 ## Binary Format
 
