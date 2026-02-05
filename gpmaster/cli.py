@@ -98,6 +98,12 @@ def main():
     )
     parser.add_argument("-q", "--quiet", action="store_true", help="Minimal output")
 
+    parser.add_argument(
+        "--no-agent",
+        action="store_true",
+        help="Do not use the gpmaster agent for caching decrypted lockbox data",
+    )
+
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     create_parser = subparsers.add_parser("create", help="Create a new lockbox")
@@ -188,7 +194,11 @@ def main():
         return 1
 
     try:
-        lockbox = Lockbox(args.lockbox, quiet=args.quiet)
+        lockbox = Lockbox(
+            args.lockbox,
+            quiet=args.quiet,
+            use_agent=not getattr(args, "no_agent", False),
+        )
 
         if args.command == "create":
             lockbox.create(args.key_id)

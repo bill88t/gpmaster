@@ -1,0 +1,2 @@
+packaging/gpmaster-agent usr/bin
+packaging/gpmaster-agent.service lib/systemd/user

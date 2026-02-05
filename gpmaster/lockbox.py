@@ -10,13 +10,20 @@ from typing import Dict, List, Optional, Tuple
 from .format import LockboxFormat
 from .gpg_ops import GPGOperations
 
+# Optional agent client for caching decrypted lockbox data (best-effort)
+try:
+    from . import agent_client
+except Exception:
+    agent_client = None
+
 
 class Lockbox:
     """Manage GPG-encrypted lockbox with secrets."""
 
-    def __init__(self, path: str, quiet: bool = False):
+    def __init__(self, path: str, quiet: bool = False, use_agent: bool = True):
         self.path = Path(path)
         self.quiet = quiet
+        self.use_agent = use_agent
         self.gpg = GPGOperations(quiet=quiet)
         self._ensure_extension()
 
@@ -38,13 +45,35 @@ class Lockbox:
     def _decrypt_data(
         self, fmt: LockboxFormat, retry: bool = True
     ) -> Tuple[bool, Optional[Dict], Optional[str]]:
-        """Decrypt lockbox data."""
+        """Decrypt lockbox data, with optional agent cache support."""
+        # Try agent cache first (best-effort)
+        if getattr(self, "use_agent", True) and agent_client is not None:
+            try:
+                cached = agent_client.get_cached(str(self.path))
+                if cached is not None:
+                    try:
+                        secrets = json.loads(cached.decode("utf-8"))
+                        return True, secrets, fmt.key_id
+                    except Exception:
+                        # fall through to normal decrypt
+                        pass
+            except Exception:
+                # agent not available; fall back to gpg
+                pass
+
         success, decrypted, key_id = self.gpg.decrypt(fmt.encrypted_data, retry=retry)
         if not success:
             return False, None, None
 
         try:
             secrets = json.loads(decrypted.decode("utf-8"))
+            # Store in agent cache for future use (best-effort)
+            if getattr(self, "use_agent", True) and agent_client is not None:
+                try:
+                    agent_client.set_cached(str(self.path), decrypted)
+                except Exception:
+                    pass
+
             return True, secrets, key_id
         except (json.JSONDecodeError, UnicodeDecodeError):
             return False, None, None

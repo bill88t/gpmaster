@@ -21,6 +21,7 @@ Depends: ${python3:Depends},
          ${misc:Depends},
          python3-gnupg,
          python3-pyotp,
+         python3-cryptography,
          gnupg
 Description: GPG-backed lockbox for secrets management
  GPMaster is a command-line tool for managing secrets in a GPG-encrypted

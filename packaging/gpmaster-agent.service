@@ -1,0 +1,15 @@
+[Unit]
+Description=GPMaster user agent for caching lockbox secrets
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/gpmaster-agent
+Restart=on-failure
+RuntimeDirectory=gpmaster
+RuntimeDirectoryMode=0700
+UMask=0077
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
