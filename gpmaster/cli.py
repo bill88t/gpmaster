@@ -97,6 +97,11 @@ def main():
         help="Path to lockbox file (default: $GPMASTER_LOCKBOX_PATH or ~/.local/state/gpmaster.gpb)",
     )
     parser.add_argument("-q", "--quiet", action="store_true", help="Minimal output")
+    parser.add_argument(
+        "--scripted",
+        action="store_true",
+        help="Scripted mode: non-interactive mode, suppress non-output messages",
+    )
 
     parser.add_argument(
         "--no-agent",
@@ -186,12 +191,16 @@ def main():
 
     args = parser.parse_args()
 
-    if args.quiet or os.environ.get("GPMASTER_QUIET"):
+    if args.scripted:
+        args.quiet = True
+        sys.stderr = open(os.devnull, "w")
+
+    if os.environ.get("GPMASTER_QUIET"):
         args.quiet = True
 
-    if not args.command:
+    if (not args.command) and not args.scripted:
         parser.print_help()
-        return 1
+        return 0
 
     try:
         lockbox = Lockbox(
@@ -390,15 +399,10 @@ def main():
 
         return 0
 
-    except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
     except Exception as e:
-        if not args.quiet:
+        if not args.scripted:
             print(f"Error: {e}", file=sys.stderr)
-        else:
-            print(str(e), file=sys.stderr)
-        return 1
+    return 1
 
 
 if __name__ == "__main__":
