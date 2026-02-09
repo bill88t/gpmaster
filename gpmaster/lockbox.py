@@ -112,6 +112,13 @@ class Lockbox:
 
         self._save_lockbox(fmt)
 
+        # Update agent cache with new plaintext secrets (best-effort)
+        if getattr(self, "use_agent", True) and agent_client is not None:
+            try:
+                agent_client.set_cached(str(self.path), secrets_json)
+            except Exception:
+                pass
+
         if not self.quiet:
             print(f"Created lockbox encrypted with key: {key_id}")
 
@@ -209,6 +216,13 @@ class Lockbox:
 
         self._save_lockbox(fmt)
 
+        # Update agent cache with new plaintext secrets (best-effort)
+        if getattr(self, "use_agent", True) and agent_client is not None:
+            try:
+                agent_client.set_cached(str(self.path), secrets_json)
+            except Exception:
+                pass
+
         if not self.quiet:
             print(f"Added secret: {name}")
 
@@ -271,6 +285,13 @@ class Lockbox:
 
         self._save_lockbox(fmt)
 
+        # Update agent cache with new plaintext secrets (best-effort)
+        if getattr(self, "use_agent", True) and agent_client is not None:
+            try:
+                agent_client.set_cached(str(self.path), secrets_json)
+            except Exception:
+                pass
+
         if not self.quiet:
             print(f"Renamed: {old_name} -> {new_name}")
 
@@ -307,6 +328,13 @@ class Lockbox:
             fmt.signature = signature
 
         self._save_lockbox(fmt)
+
+        # Update agent cache with new plaintext secrets (best-effort)
+        if getattr(self, "use_agent", True) and agent_client is not None:
+            try:
+                agent_client.set_cached(str(self.path), secrets_json)
+            except Exception:
+                pass
 
         if not self.quiet:
             print(f"Deleted secret: {name}")
@@ -396,6 +424,13 @@ class Lockbox:
             fmt.signature = None
 
         self._save_lockbox(fmt)
+
+        # Update agent cache with new plaintext secrets (best-effort)
+        if getattr(self, "use_agent", True) and agent_client is not None:
+            try:
+                agent_client.set_cached(str(self.path), secrets_json)
+            except Exception:
+                pass
 
         if not self.quiet:
             print(f"Lockbox re-keyed to: {new_key_id}")
@@ -493,6 +528,13 @@ class Lockbox:
 
         self._save_lockbox(fmt)
 
+        # Update agent cache with new plaintext secrets (best-effort)
+        if getattr(self, "use_agent", True) and agent_client is not None:
+            try:
+                agent_client.set_cached(str(self.path), secrets_json)
+            except Exception:
+                pass
+
         if not keep_source:
             os.unlink(file_path)
             if not self.quiet:
@@ -536,6 +578,13 @@ class Lockbox:
             fmt.signature = signature
 
         self._save_lockbox(fmt)
+
+        # Update agent cache with new plaintext secrets (best-effort)
+        if getattr(self, "use_agent", True) and agent_client is not None:
+            try:
+                agent_client.set_cached(str(self.path), secrets_json)
+            except Exception:
+                pass
 
         if not self.quiet:
             print(f"Deleted file: {filename}")
