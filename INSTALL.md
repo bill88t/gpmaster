@@ -115,6 +115,20 @@ export GPMASTER_KEY_ID="YOUR_GPG_KEY_ID"
 # export GPMASTER_QUIET=1
 ```
 
+# Termux / OpenKeychain (okc-agent)
+
+If using OpenKeychain via Termux's okc-agent, set the agent socket and optionally the gpg binary:
+
+```bash
+# Path to the okc-agent socket (examples vary by install)
+export GPMASTER_AGENT_SOCKET="$HOME/.okc/agent.sock"
+
+# Optional: specify a custom gpg binary
+export GPMASTER_GPG_BINARY="/path/to/gpg"
+```
+
+gpmaster will respect GPMASTER_AGENT_SOCKET or OKC_AGENT_SOCKET and GPMASTER_GPG_BINARY (or GPG_BINARY/GPG) to help integrate with external GPG agents like okc-agent.
+
 Get your GPG key ID:
 ```bash
 gpg --list-secret-keys --keyid-format LONG

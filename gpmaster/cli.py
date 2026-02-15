@@ -8,6 +8,11 @@ import tty
 import select
 from pathlib import Path
 
+import base64
+import re
+import hmac
+import hashlib
+
 from .lockbox import Lockbox
 
 try:
@@ -16,6 +21,61 @@ try:
     TOTP_AVAILABLE = True
 except ImportError:
     TOTP_AVAILABLE = False
+
+
+BASE32_RE = re.compile(r"^[A-Z2-7]+=*$", re.IGNORECASE)
+
+
+def normalize_totp_secret(secret: str) -> str:
+    s = secret.strip()
+
+    # Treat strings that look like base32 (case-insensitive) as base32
+    if BASE32_RE.fullmatch(s):
+        # allow lowercase base32 and missing padding
+        s_b32 = s.rstrip("=")
+        pad = (-len(s_b32)) % 8
+        if pad:
+            s_b32 += "=" * pad
+        raw = base64.b32decode(s_b32, casefold=True)
+    else:
+        # Try flexible base64 decoding: support URL-safe alphabet and missing padding
+        b = s.encode("ascii")
+        b = b.replace(b"-", b"+").replace(b"_", b"/")
+        pad = (-len(b)) % 4
+        if pad:
+            b += b"=" * pad
+        raw = base64.b64decode(b)
+
+    # Return base32 (uppercase) without padding
+    return base64.b32encode(raw).decode("ascii").rstrip("=")
+
+
+def totp_from_base64(secret_b64: str, digits: int = 6, period: int = 30) -> str:
+    # decode base64 (flexible: urlsafe, missing padding)
+    b = secret_b64.strip().encode("ascii")
+    b = b.replace(b"-", b"+").replace(b"_", b"/")
+    pad = (-len(b)) % 4
+    if pad:
+        b += b"=" * pad
+    secret = base64.b64decode(b)
+
+    # calculate counter
+    counter = int(time.time() // period)
+    counter_bytes = counter.to_bytes(8, byteorder="big")
+
+    # HMAC-SHA1
+    hmac_digest = hmac.new(secret, counter_bytes, hashlib.sha1).digest()
+
+    # dynamic truncation
+    offset = hmac_digest[-1] & 0x0F
+    code_int = (
+        (hmac_digest[offset] & 0x7F) << 24
+        | (hmac_digest[offset + 1] & 0xFF) << 16
+        | (hmac_digest[offset + 2] & 0xFF) << 8
+        | (hmac_digest[offset + 3] & 0xFF)
+    )
+
+    return str(code_int % (10**digits)).zfill(digits)
 
 
 def get_default_lockbox_path() -> str:
@@ -30,15 +90,20 @@ def interactive_totp_viewer(lockbox, quiet):
     """Interactive TOTP viewer with timer."""
     secrets = lockbox.dump_secrets()
 
-    totp_secrets = {}
+    totp_getters = {}
     for name, value in secrets.items():
         try:
-            totp = pyotp.TOTP(value)
-            totp_secrets[name] = totp
+            s = value.strip()
+            if BASE32_RE.fullmatch(s):
+                norm = normalize_totp_secret(value)
+                # capture norm in default arg
+                totp_getters[name] = lambda n=norm: pyotp.TOTP(n).now()
+            else:
+                totp_getters[name] = lambda v=value: totp_from_base64(v)
         except Exception:
             pass
 
-    if not totp_secrets:
+    if not totp_getters:
         print("No valid TOTP secrets found", file=sys.stderr)
         return
 
@@ -61,13 +126,16 @@ def interactive_totp_viewer(lockbox, quiet):
                 print("Interactive TOTP Viewer - Press any key to exit")
                 print(f"Time remaining: {remaining}s")
 
-                for name, totp in totp_secrets.items():
-                    code = totp.now()
+                for name, getter in totp_getters.items():
+                    try:
+                        code = getter()
+                    except Exception:
+                        code = "Invalid TOTP"
                     print(f"\n{name}: {code}")
 
                 last_code_time = int(current_time) // totp_period
             else:
-                print(f"\033[2;0HTime remaining: {remaining}s", end="", flush=True)
+                print(f"\033[2;0HTime remaining: {remaining}s \010", end="", flush=True)
 
             if select.select([sys.stdin], [], [], 0.1)[0]:
                 sys.stdin.read(1)
@@ -223,7 +291,13 @@ def main():
             secret = input("Enter secret: " if not args.quiet else "")
             if args.totp:
                 try:
-                    pyotp.TOTP(secret)
+                    s = secret.strip()
+                    if BASE32_RE.fullmatch(s):
+                        secret = normalize_totp_secret(secret)
+                        pyotp.TOTP(secret)
+                    else:
+                        # validate base64 by attempting to compute a code
+                        _ = totp_from_base64(secret)
                 except Exception as e:
                     print(f"Invalid TOTP secret: {e}", file=sys.stderr)
                     return 1
@@ -261,8 +335,11 @@ def main():
                     return 1
 
                 try:
-                    totp = pyotp.TOTP(secret)
-                    code = totp.now()
+                    s = secret.strip()
+                    if BASE32_RE.fullmatch(s):
+                        code = pyotp.TOTP(normalize_totp_secret(secret)).now()
+                    else:
+                        code = totp_from_base64(secret)
                     print(code)
                 except Exception as e:
                     print(f"Failed to generate TOTP code: {e}", file=sys.stderr)

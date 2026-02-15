@@ -11,8 +11,25 @@ class GPGOperations:
     """Handle GPG encryption, decryption, and signing with retry logic."""
 
     def __init__(self, quiet: bool = False):
-        self.gpg = gnupg.GPG()
+        # Allow overriding gpg binary and agent socket for environments like Termux/OpenKeychain
+        # Users can set GPMASTER_GPG_BINARY or GPG_BINARY or GPG to point to the gpg executable,
+        # and can set GPMASTER_AGENT_SOCKET or OKC_AGENT_SOCKET to point to the agent socket.
+        # If GPG_AGENT_INFO is not already set, prefer these agent variables.
+        gpg_binary = (
+            os.environ.get("GPMASTER_GPG_BINARY")
+            or os.environ.get("GPG_BINARY")
+            or os.environ.get("GPG")
+        )
+        agent_socket = os.environ.get("GPMASTER_AGENT_SOCKET") or os.environ.get(
+            "OKC_AGENT_SOCKET"
+        )
+        if agent_socket and "GPG_AGENT_INFO" not in os.environ:
+            os.environ["GPG_AGENT_INFO"] = agent_socket
         self.quiet = quiet
+        if gpg_binary:
+            self.gpg = gnupg.GPG(gpgbinary=gpg_binary)
+        else:
+            self.gpg = gnupg.GPG()
 
     def encrypt(
         self, data: bytes, key_id: str, retry: bool = True
