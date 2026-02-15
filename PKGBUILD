@@ -1,6 +1,6 @@
 # Maintainer: Bill Sideris <bill88t@feline.gr>
 pkgname=gpmaster
-pkgver=1.4.1
+pkgver=1.5.0
 pkgrel=1
 pkgdesc="GPG-backed lockbox for secrets management"
 arch=('any')
@@ -30,6 +30,9 @@ package() {
 
     # Install systemd user unit
     install -Dm644 packaging/gpmaster-agent.service "$pkgdir/usr/lib/systemd/user/gpmaster-agent.service"
+
+    # Install okc-gpg wrapper (filters out --no-tty)
+    install -Dm755 packaging/gpg-wrap "$pkgdir/usr/lib/gpmaster/gpg-wrap"
 
     # Install bash completion
     install -Dm644 gpmaster-completion.bash "$pkgdir/usr/share/bash-completion/completions/gpmaster"

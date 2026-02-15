@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="gpmaster",
-    version="1.2.1",
+    version="1.5.0",
     description="GPG-backed lockbox for secrets management",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
@@ -16,6 +16,7 @@ setup(
         "python-gnupg>=0.5.0",
         "pyotp>=2.8.0",
     ],
+    scripts=["packaging/gpg-wrap"],
     entry_points={
         "console_scripts": [
             "gpmaster=gpmaster.cli:main",

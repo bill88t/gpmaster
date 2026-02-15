@@ -4,6 +4,7 @@ import gnupg
 import sys
 import tempfile
 import os
+import shutil
 from typing import Optional, Tuple
 
 
@@ -11,24 +12,30 @@ class GPGOperations:
     """Handle GPG encryption, decryption, and signing with retry logic."""
 
     def __init__(self, quiet: bool = False):
-        # Allow overriding gpg binary and agent socket for environments like Termux/OpenKeychain
-        # Users can set GPMASTER_GPG_BINARY or GPG_BINARY or GPG to point to the gpg executable,
-        # and can set GPMASTER_AGENT_SOCKET or OKC_AGENT_SOCKET to point to the agent socket.
-        # If GPG_AGENT_INFO is not already set, prefer these agent variables.
+        # Determine gpg binary: env override > packaged wrapper > default
         gpg_binary = (
             os.environ.get("GPMASTER_GPG_BINARY")
             or os.environ.get("GPG_BINARY")
             or os.environ.get("GPG")
         )
+        if not gpg_binary:
+            wrap_path = shutil.which("gpg-wrap")
+            okc_path = shutil.which("okc-gpg")
+            if okc_path and wrap_path:
+                gpg_binary = wrap_path
+
         agent_socket = os.environ.get("GPMASTER_AGENT_SOCKET") or os.environ.get(
             "OKC_AGENT_SOCKET"
         )
+
         if agent_socket and "GPG_AGENT_INFO" not in os.environ:
             os.environ["GPG_AGENT_INFO"] = agent_socket
         self.quiet = quiet
         if gpg_binary:
+            print(f'Using GPG binary: "{gpg_binary}"')
             self.gpg = gnupg.GPG(gpgbinary=gpg_binary)
         else:
+            print("Using system GPG for all operations.")
             self.gpg = gnupg.GPG()
 
     def encrypt(
