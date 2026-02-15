@@ -1,17 +1,7 @@
-import argparse
-import json
-import os
-import sys
-import time
-import termios
-import tty
-import select
+import argparse, json, os, sys, time, termios, tty, select
 from pathlib import Path
 
-import base64
-import re
-import hmac
-import hashlib
+import base64, re, hmac, hashlib
 
 from .lockbox import Lockbox
 
@@ -104,7 +94,7 @@ def interactive_totp_viewer(lockbox, quiet):
             pass
 
     if not totp_getters:
-        print("No valid TOTP secrets found", file=sys.stderr)
+        print("[GPMASTER:] No valid TOTP secrets found", file=sys.stderr)
         return
 
     old_settings = termios.tcgetattr(sys.stdin)
@@ -112,7 +102,7 @@ def interactive_totp_viewer(lockbox, quiet):
         tty.setcbreak(sys.stdin.fileno())
 
         print("\033[2J\033[H", end="", flush=True)
-        print("Interactive TOTP Viewer - Press any key to exit\n")
+        print("[GPMASTER:] Interactive TOTP Viewer - Press any key to exit\n")
 
         last_code_time = 0
         while True:
@@ -123,8 +113,8 @@ def interactive_totp_viewer(lockbox, quiet):
             codes_changed = int(current_time) // totp_period != last_code_time
             if codes_changed:
                 print("\033[H", end="", flush=True)
-                print("Interactive TOTP Viewer - Press any key to exit")
-                print(f"Time remaining: {remaining}s")
+                print("[GPMASTER:] Interactive TOTP Viewer - Press any key to exit")
+                print(f"[GPMASTER:] Time remaining: {remaining}s")
 
                 for name, getter in totp_getters.items():
                     try:
@@ -135,7 +125,11 @@ def interactive_totp_viewer(lockbox, quiet):
 
                 last_code_time = int(current_time) // totp_period
             else:
-                print(f"\033[2;0HTime remaining: {remaining}s \010", end="", flush=True)
+                print(
+                    f"\033[2;0H[GPMASTER:] Time remaining: {remaining}s \010",
+                    end="",
+                    flush=True,
+                )
 
             if select.select([sys.stdin], [], [], 0.1)[0]:
                 sys.stdin.read(1)
@@ -283,12 +277,12 @@ def main():
         elif args.command == "add":
             if args.totp and not TOTP_AVAILABLE:
                 print(
-                    "Error: pyotp not installed. Install it for TOTP support.",
+                    "[GPMASTER:] Error: pyotp not installed",
                     file=sys.stderr,
                 )
                 return 1
 
-            secret = input("Enter secret: " if not args.quiet else "")
+            secret = input("[GPMASTER:] Enter secret: " if not args.quiet else "")
             if args.totp:
                 try:
                     s = secret.strip()
@@ -299,7 +293,7 @@ def main():
                         # validate base64 by attempting to compute a code
                         _ = totp_from_base64(secret)
                 except Exception as e:
-                    print(f"Invalid TOTP secret: {e}", file=sys.stderr)
+                    print(f"[GPMASTER:] Invalid TOTP secret: {e}", file=sys.stderr)
                     return 1
 
             # Auto-create lockbox if key provided
@@ -312,15 +306,18 @@ def main():
             secret, is_totp = lockbox.get_secret(args.name)
 
             if secret is None:
-                print(f"Secret not found: {args.name}", file=sys.stderr)
+                print(f"[GPMASTER:] Secret not found: {args.name}", file=sys.stderr)
                 return 1
 
             if args.interactive:
                 if not TOTP_AVAILABLE:
-                    print("Error: pyotp not installed", file=sys.stderr)
+                    print("[GPMASTER:] Error: pyotp not installed", file=sys.stderr)
                     return 1
                 if not is_totp:
-                    print(f"Error: {args.name} is not a TOTP secret", file=sys.stderr)
+                    print(
+                        f"[GPMASTER:] Error: {args.name} is not a TOTP secret",
+                        file=sys.stderr,
+                    )
                     return 1
 
                 # Create a temporary lockbox dict with just this secret
@@ -331,7 +328,7 @@ def main():
                 lockbox.dump_secrets = old_dump
             elif args.totp_code or is_totp:
                 if not TOTP_AVAILABLE:
-                    print("Error: pyotp not installed", file=sys.stderr)
+                    print("[GPMASTER:] Error: pyotp not installed", file=sys.stderr)
                     return 1
 
                 try:
@@ -342,7 +339,10 @@ def main():
                         code = totp_from_base64(secret)
                     print(code)
                 except Exception as e:
-                    print(f"Failed to generate TOTP code: {e}", file=sys.stderr)
+                    print(
+                        f"[GPMASTER:] Failed to generate TOTP code: {e}",
+                        file=sys.stderr,
+                    )
                     return 1
             else:
                 print(secret)
@@ -357,25 +357,27 @@ def main():
             titles, note_content, note_signature, key_id = lockbox.get_info()
 
             if not args.quiet:
-                print(f"Lockbox encrypted with key: {key_id}")
+                print(f"[GPMASTER:] Lockbox encrypted with key: {key_id}")
 
             # Separate files from secrets
             files = [t for t in titles if t.startswith("_FILE_")]
             secrets = [t for t in titles if not t.startswith("_FILE_")]
 
             if not args.quiet and len(secrets) > 0:
-                print(f"\nSecrets ({len(secrets)}):")
+                print(f"[GPMASTER:] Secrets ({len(secrets)}):")
             for secret in secrets:
                 print(f"  {secret}")
 
             if not args.quiet and len(files) > 0:
-                print(f"\nFiles ({len(files)}):")
+                if len(secrets):
+                    print()
+                print(f"[GPMASTER:] Files ({len(files)}):")
             for file_key in files:
                 filename = file_key[6:]  # Remove "_FILE_" prefix
                 print(f"  {filename}")
 
             if note_content is not None and not args.quiet:
-                print("\nNote:")
+                print("\n[GPMASTER:] Note:")
                 print(note_content)
 
                 if note_signature:
@@ -384,11 +386,13 @@ def main():
                         data_to_verify, note_signature
                     )
                     if valid:
-                        print(f"Note signature valid (signed by: {signer_key})")
+                        print(
+                            f"[GPMASTER:] Note signature valid (signed by: {signer_key})"
+                        )
                     else:
-                        print(f"Note signature INVALID")
+                        print(f"[GPMASTER:] Note signature INVALID")
                 else:
-                    print(f"Note present but not signed")
+                    print(f"[GPMASTER:] Note present but not signed")
 
         elif args.command == "note":
             lockbox.edit_note()
@@ -421,7 +425,7 @@ def main():
         elif args.command == "file":
             if not args.file_command:
                 print(
-                    "Error: file subcommand required (add, remove, list, get)",
+                    "[GPMASTER:] Error: file subcommand required (add, remove, list, get)",
                     file=sys.stderr,
                 )
                 return 1
@@ -438,7 +442,7 @@ def main():
             elif args.file_command == "list":
                 files = lockbox.list_files()
                 if not args.quiet:
-                    print(f"Files in vault ({len(files)}):")
+                    print(f"[GPMASTER:] Files in vault ({len(files)}):")
                 for filename in files:
                     print(f"  {filename}")
 
@@ -446,7 +450,9 @@ def main():
                 file_data = lockbox.get_file(args.filename)
 
                 if file_data is None:
-                    print(f"File not found: {args.filename}", file=sys.stderr)
+                    print(
+                        f"[GPMASTER:] File not found: {args.filename}", file=sys.stderr
+                    )
                     return 1
 
                 if args.text:
@@ -459,7 +465,7 @@ def main():
                     with open(target_path, "wb") as f:
                         f.write(file_data)
                     if not args.quiet:
-                        print(f"File saved to: {args.path}")
+                        print(f"[GPMASTER:] File saved to: {args.path}")
                 elif args.tmp:
                     # Save to tmpfile
                     uid = os.getuid()
@@ -467,7 +473,7 @@ def main():
                     with open(tmpfile_path, "wb") as f:
                         f.write(file_data)
                     if not args.quiet:
-                        print(f"File saved to: {tmpfile_path}")
+                        print(f"[GPMASTER:] File saved to: {tmpfile_path}")
                     else:
                         print(tmpfile_path)
                 else:
@@ -478,7 +484,7 @@ def main():
 
     except Exception as e:
         if not args.scripted:
-            print(f"Error: {e}", file=sys.stderr)
+            print(f"[GPMASTER:] Error: {e}", file=sys.stderr)
     return 1
 
 

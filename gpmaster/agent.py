@@ -24,7 +24,8 @@ class AgentServer:
     def __init__(self, socket_path: str):
         if AESGCM is None:
             print(
-                "cryptography package is required for gpmaster-agent", file=sys.stderr
+                "[GPMASTER:] cryptography package is required for gpmaster-agent",
+                file=sys.stderr,
             )
             sys.exit(1)
 
@@ -143,7 +144,7 @@ class AgentServer:
 
             # Basic logging for debugging (to stderr; systemd will capture)
             try:
-                sys.stderr.write(f"gpmaster-agent: cmd={cmd} path={path}\n")
+                sys.stderr.write(f"[GPMASTER:] gpmaster-agent: cmd={cmd} path={path}\n")
             except Exception:
                 pass
 

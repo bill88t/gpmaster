@@ -63,7 +63,7 @@ class LockboxFormat:
         lockbox = cls()
 
         if not data.startswith(MAGIC):
-            raise ValueError("Invalid lockbox file: wrong magic header")
+            raise ValueError("[GPMASTER:] Invalid lockbox file: wrong magic header")
 
         offset = len(MAGIC)
 
@@ -71,7 +71,7 @@ class LockboxFormat:
         offset += 1
 
         if version != VERSION:
-            raise ValueError(f"Unsupported lockbox version: {version}")
+            raise ValueError(f"[GPMASTER:] Unsupported lockbox version: {version}")
 
         key_id_len = struct.unpack("H", data[offset : offset + 2])[0]
         offset += 2
@@ -116,7 +116,9 @@ class LockboxFormat:
         ).digest()
 
         if stored_checksum != calculated_checksum:
-            raise ValueError("Checksum validation failed: lockbox may be corrupted")
+            raise ValueError(
+                "[GPMASTER:] Checksum validation failed: lockbox may be corrupted"
+            )
 
         return lockbox
 

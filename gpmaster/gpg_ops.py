@@ -32,10 +32,12 @@ class GPGOperations:
             os.environ["GPG_AGENT_INFO"] = agent_socket
         self.quiet = quiet
         if gpg_binary:
-            print(f'Using GPG binary: "{gpg_binary}"')
+            if not self.quiet:
+                print(f'[GPMASTER:] Using GPG binary: "{gpg_binary}"')
             self.gpg = gnupg.GPG(gpgbinary=gpg_binary)
         else:
-            print("Using system GPG for all operations.")
+            if not self.quiet:
+                print("[GPMASTER:] Using system GPG for all operations.")
             self.gpg = gnupg.GPG()
 
     def encrypt(
@@ -50,14 +52,14 @@ class GPGOperations:
             if not retry or self.quiet:
                 return False, None
 
-            print(f"Encryption failed: {result.status}", file=sys.stderr)
+            print(f"[GPMASTER:] Encryption failed: {result.status}", file=sys.stderr)
             try:
                 response = input(
-                    "Retry encryption? (Enter to retry, Ctrl+C to abort): "
+                    "[GPMASTER:] Retry encryption? (Enter to retry, Ctrl+C to abort): "
                 ).strip()
                 continue
             except KeyboardInterrupt:
-                print("\nAborted", file=sys.stderr)
+                print("\n[GPMASTER:] Aborted", file=sys.stderr)
                 return False, None
 
     def decrypt(
@@ -72,14 +74,14 @@ class GPGOperations:
             if not retry or self.quiet:
                 return False, None, None
 
-            print(f"Decryption failed: {result.status}", file=sys.stderr)
+            print(f"[GPMASTER:] Decryption failed: {result.status}", file=sys.stderr)
             try:
                 response = input(
-                    "Retry decryption? (Enter to retry, Ctrl+C to abort): "
+                    "[GPMASTER:] Retry decryption? (Enter to retry, Ctrl+C to abort): "
                 ).strip()
                 continue
             except KeyboardInterrupt:
-                print("\nAborted", file=sys.stderr)
+                print("\n[GPMASTER:] Aborted", file=sys.stderr)
                 return False, None, None
 
     def sign(
@@ -95,14 +97,14 @@ class GPGOperations:
             if not retry or self.quiet:
                 return False, None
 
-            print(f"Signing failed: {result.status}", file=sys.stderr)
+            print(f"[GPMASTER:] Signing failed: {result.status}", file=sys.stderr)
             try:
                 response = input(
-                    "Retry signing? (Enter to retry, Ctrl+C to abort): "
+                    "[GPMASTER:] Retry signing? (Enter to retry, Ctrl+C to abort): "
                 ).strip()
                 continue
             except KeyboardInterrupt:
-                print("\nAborted", file=sys.stderr)
+                print("\n[GPMASTER:] Aborted", file=sys.stderr)
                 return False, None
 
     def verify(self, data: bytes, signature: bytes) -> Tuple[bool, Optional[str]]:

@@ -30,12 +30,12 @@ class Lockbox:
     def _ensure_extension(self):
         """Ensure lockbox file has .gpb extension."""
         if self.path.suffix != ".gpb":
-            raise ValueError("Lockbox file must have .gpb extension")
+            raise ValueError("[GPMASTER:] Lockbox file must have .gpb extension")
 
     def _load_format(self) -> LockboxFormat:
         """Load and validate lockbox format."""
         if not self.path.exists():
-            raise FileNotFoundError(f"Lockbox not found: {self.path}")
+            raise FileNotFoundError(f"[GPMASTER:] Lockbox not found: {self.path}")
 
         with open(self.path, "rb") as f:
             data = f.read()
@@ -89,14 +89,14 @@ class Lockbox:
     def create(self, key_id: str):
         """Create a new lockbox."""
         if self.path.exists():
-            raise FileExistsError(f"Lockbox already exists: {self.path}")
+            raise FileExistsError(f"[GPMASTER:] Lockbox already exists: {self.path}")
 
         secrets = {}
         secrets_json = json.dumps(secrets, separators=(",", ":")).encode("utf-8")
 
         success, encrypted = self.gpg.encrypt(secrets_json, key_id, retry=False)
         if not success:
-            raise RuntimeError("Failed to encrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to encrypt lockbox")
 
         fmt = LockboxFormat()
         fmt.key_id = key_id
@@ -120,7 +120,7 @@ class Lockbox:
                 pass
 
         if not self.quiet:
-            print(f"Created lockbox encrypted with key: {key_id}")
+            print(f"[GPMASTER:] Created lockbox encrypted with key: {key_id}")
 
     def validate(self) -> bool:
         """Validate lockbox integrity and signature."""
@@ -128,7 +128,7 @@ class Lockbox:
             fmt = self._load_format()
 
             if not self.quiet:
-                print(f"Lockbox encrypted with key: {fmt.key_id}")
+                print(f"[GPMASTER:] Lockbox encrypted with key: {fmt.key_id}")
 
             if fmt.signature:
                 data_to_verify = fmt.key_id.encode("utf-8") + fmt.encrypted_data
@@ -136,20 +136,20 @@ class Lockbox:
 
                 if valid:
                     if not self.quiet:
-                        print(f"Signature valid (signed by: {signer_key})")
+                        print(f"[GPMASTER:] Signature valid (signed by: {signer_key})")
                     return True
                 else:
                     if not self.quiet:
-                        print("Signature validation failed")
+                        print("[GPMASTER:] Signature validation failed")
                     return False
             else:
                 if not self.quiet:
-                    print("No signature present")
+                    print("[GPMASTER:] No signature present")
                 return True
 
         except Exception as e:
             if not self.quiet:
-                print(f"Validation failed: {e}")
+                print(f"[GPMASTER:] Validation failed: {e}")
             return False
 
     def list_contents(self) -> Tuple[List[str], str]:
@@ -174,18 +174,18 @@ class Lockbox:
             fmt = self._load_format()
             success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
             if not success:
-                raise RuntimeError("Failed to decrypt lockbox")
+                raise RuntimeError("[GPMASTER:] Failed to decrypt lockbox")
 
             if not self.quiet:
-                print(f"Decrypted with key: {dec_key}")
+                print(f"[GPMASTER:] Decrypted with key: {dec_key}")
         else:
             if not auto_create_key:
                 raise FileNotFoundError(
-                    "Lockbox does not exist. Create it first with 'gpmaster create <key-id>' or set GPMASTER_KEY_ID environment variable."
+                    "[GPMASTER:] Lockbox does not exist. Create it first with 'gpmaster create <key-id>' or set GPMASTER_KEY_ID environment variable."
                 )
 
             if not self.quiet:
-                print(f"Creating new lockbox with key: {auto_create_key}")
+                print(f"[GPMASTER:] Creating new lockbox with key: {auto_create_key}")
             self.create(auto_create_key)
 
             fmt = self._load_format()
@@ -205,7 +205,7 @@ class Lockbox:
             secrets_json, fmt.key_id, retry=not self.quiet
         )
         if not success:
-            raise RuntimeError("Failed to encrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to encrypt lockbox")
 
         fmt.encrypted_data = encrypted
 
@@ -224,21 +224,21 @@ class Lockbox:
                 pass
 
         if not self.quiet:
-            print(f"Added secret: {name}")
+            print(f"[GPMASTER:] Added secret: {name}")
 
     def get_secret(self, name: str) -> Tuple[Optional[str], bool]:
         """Retrieve a secret from the lockbox."""
         fmt = self._load_format()
 
         if not self.quiet:
-            print(f"Encrypted with key: {fmt.key_id}")
+            print(f"[GPMASTER:] Encrypted with key: {fmt.key_id}")
 
         success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
-            raise RuntimeError("Failed to decrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to decrypt lockbox")
 
         if not self.quiet:
-            print(f"Decrypted with key: {dec_key}")
+            print(f"[GPMASTER:] Decrypted with key: {dec_key}")
 
         if name not in secrets:
             return None, False
@@ -252,16 +252,16 @@ class Lockbox:
         fmt = self._load_format()
         success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
-            raise RuntimeError("Failed to decrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to decrypt lockbox")
 
         if not self.quiet:
-            print(f"Decrypted with key: {dec_key}")
+            print(f"[GPMASTER:] Decrypted with key: {dec_key}")
 
         if old_name not in secrets:
-            raise KeyError(f"Secret not found: {old_name}")
+            raise KeyError(f"[GPMASTER:] Secret not found: {old_name}")
 
         if new_name in secrets:
-            raise KeyError(f"Secret already exists: {new_name}")
+            raise KeyError(f"[GPMASTER:] Secret already exists: {new_name}")
 
         secrets[new_name] = secrets.pop(old_name)
 
@@ -274,7 +274,7 @@ class Lockbox:
             secrets_json, fmt.key_id, retry=not self.quiet
         )
         if not success:
-            raise RuntimeError("Failed to encrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to encrypt lockbox")
 
         fmt.encrypted_data = encrypted
 
@@ -293,20 +293,20 @@ class Lockbox:
                 pass
 
         if not self.quiet:
-            print(f"Renamed: {old_name} -> {new_name}")
+            print(f"[GPMASTER:] Renamed: {old_name} -> {new_name}")
 
     def delete_secret(self, name: str):
         """Delete a secret."""
         fmt = self._load_format()
         success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
-            raise RuntimeError("Failed to decrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to decrypt lockbox")
 
         if not self.quiet:
-            print(f"Decrypted with key: {dec_key}")
+            print(f"[GPMASTER:] Decrypted with key: {dec_key}")
 
         if name not in secrets:
-            raise KeyError(f"Secret not found: {name}")
+            raise KeyError(f"[GPMASTER:] Secret not found: {name}")
 
         del secrets[name]
 
@@ -318,7 +318,7 @@ class Lockbox:
             secrets_json, fmt.key_id, retry=not self.quiet
         )
         if not success:
-            raise RuntimeError("Failed to encrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to encrypt lockbox")
 
         fmt.encrypted_data = encrypted
 
@@ -337,7 +337,7 @@ class Lockbox:
                 pass
 
         if not self.quiet:
-            print(f"Deleted secret: {name}")
+            print(f"[GPMASTER:] Deleted secret: {name}")
 
     def edit_note(self):
         """Edit notes document with $EDITOR and sign it."""
@@ -357,7 +357,10 @@ class Lockbox:
 
             if result.returncode != 0:
                 if not self.quiet:
-                    print("Editor exited with error, not saving", file=sys.stderr)
+                    print(
+                        "[GPMASTER:] Editor exited with error, not saving",
+                        file=sys.stderr,
+                    )
                 os.unlink(temp_path)
                 return
 
@@ -366,7 +369,7 @@ class Lockbox:
 
             if new_content == current_content:
                 if not self.quiet:
-                    print("No changes made")
+                    print("[GPMASTER:] No changes made")
                 os.unlink(temp_path)
                 return
 
@@ -375,7 +378,10 @@ class Lockbox:
 
             if not success:
                 if not self.quiet:
-                    print("Failed to sign note, not saving changes", file=sys.stderr)
+                    print(
+                        "[GPMASTER:] Failed to sign note, not saving changes",
+                        file=sys.stderr,
+                    )
                 os.unlink(temp_path)
                 return
 
@@ -385,7 +391,7 @@ class Lockbox:
             self._save_lockbox(fmt)
 
             if not self.quiet:
-                print("Note saved and signed")
+                print("[GPMASTER:] Note saved and signed")
 
         finally:
             if os.path.exists(temp_path):
@@ -396,22 +402,22 @@ class Lockbox:
         fmt = self._load_format()
 
         if not self.quiet:
-            print(f"Current key: {fmt.key_id}")
+            print(f"[GPMASTER:] Current key: {fmt.key_id}")
 
         success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
             raise RuntimeError("Failed to decrypt lockbox")
 
         if not self.quiet:
-            print(f"Decrypted with key: {dec_key}")
-            print(f"Re-encrypting with key: {new_key_id}")
+            print(f"[GPMASTER:] Decrypted with key: {dec_key}")
+            print(f"[GPMASTER:] Re-encrypting with key: {new_key_id}")
 
         secrets_json = json.dumps(secrets, separators=(",", ":")).encode("utf-8")
         success, encrypted = self.gpg.encrypt(
             secrets_json, new_key_id, retry=not self.quiet
         )
         if not success:
-            raise RuntimeError("Failed to encrypt with new key")
+            raise RuntimeError("[GPMASTER:] Failed to encrypt with new key")
 
         fmt.key_id = new_key_id
         fmt.encrypted_data = encrypted
@@ -433,21 +439,21 @@ class Lockbox:
                 pass
 
         if not self.quiet:
-            print(f"Lockbox re-keyed to: {new_key_id}")
+            print(f"[GPMASTER:] Lockbox re-keyed to: {new_key_id}")
 
     def dump_secrets(self, format: str = "list") -> Dict:
         """Dump all secrets (non-TOTP form)."""
         fmt = self._load_format()
 
         if not self.quiet:
-            print(f"Encrypted with key: {fmt.key_id}", file=sys.stderr)
+            print(f"[GPMASTER:] Encrypted with key: {fmt.key_id}", file=sys.stderr)
 
         success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
-            raise RuntimeError("Failed to decrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to decrypt lockbox")
 
         if not self.quiet:
-            print(f"Decrypted with key: {dec_key}", file=sys.stderr)
+            print(f"[GPMASTER:] Decrypted with key: {dec_key}", file=sys.stderr)
 
         result = {}
         for name, entry in secrets.items():
@@ -474,7 +480,7 @@ class Lockbox:
         """Add a file to the lockbox."""
         file_path_obj = Path(file_path)
         if not file_path_obj.exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
+            raise FileNotFoundError(f"[GPMASTER:] File not found: {file_path}")
 
         filename = file_path_obj.name
         secret_key = f"_FILE_{filename}"
@@ -489,18 +495,18 @@ class Lockbox:
             fmt = self._load_format()
             success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
             if not success:
-                raise RuntimeError("Failed to decrypt lockbox")
+                raise RuntimeError("[GPMASTER:] Failed to decrypt lockbox")
 
             if not self.quiet:
-                print(f"Decrypted with key: {dec_key}")
+                print(f"[GPMASTER:] Decrypted with key: {dec_key}")
         else:
             if not auto_create_key:
                 raise FileNotFoundError(
-                    "Lockbox does not exist. Create it first with 'gpmaster create <key-id>' or set GPMASTER_KEY_ID environment variable."
+                    "[GPMASTER:] Lockbox does not exist. Create it first with 'gpmaster create <key-id>' or set GPMASTER_KEY_ID environment variable."
                 )
 
             if not self.quiet:
-                print(f"Creating new lockbox with key: {auto_create_key}")
+                print(f"[GPMASTER:] Creating new lockbox with key: {auto_create_key}")
             self.create(auto_create_key)
 
             fmt = self._load_format()
@@ -517,7 +523,7 @@ class Lockbox:
             secrets_json, fmt.key_id, retry=not self.quiet
         )
         if not success:
-            raise RuntimeError("Failed to encrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to encrypt lockbox")
 
         fmt.encrypted_data = encrypted
 
@@ -538,10 +544,10 @@ class Lockbox:
         if not keep_source:
             os.unlink(file_path)
             if not self.quiet:
-                print(f"Added file: {filename} (source removed)")
+                print(f"[GPMASTER:] Added file: {filename} (source removed)")
         else:
             if not self.quiet:
-                print(f"Added file: {filename}")
+                print(f"[GPMASTER:] Added file: {filename}")
 
     def remove_file(self, filename: str):
         """Remove a file from the lockbox."""
@@ -550,13 +556,13 @@ class Lockbox:
         fmt = self._load_format()
         success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
-            raise RuntimeError("Failed to decrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to decrypt lockbox")
 
         if not self.quiet:
-            print(f"Decrypted with key: {dec_key}")
+            print(f"[GPMASTER:] Decrypted with key: {dec_key}")
 
         if secret_key not in secrets:
-            raise KeyError(f"File not found: {filename}")
+            raise KeyError(f"[GPMASTER:] File not found: {filename}")
 
         del secrets[secret_key]
 
@@ -568,7 +574,7 @@ class Lockbox:
             secrets_json, fmt.key_id, retry=not self.quiet
         )
         if not success:
-            raise RuntimeError("Failed to encrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to encrypt lockbox")
 
         fmt.encrypted_data = encrypted
 
@@ -587,7 +593,7 @@ class Lockbox:
                 pass
 
         if not self.quiet:
-            print(f"Deleted file: {filename}")
+            print(f"[GPMASTER:] Deleted file: {filename}")
 
     def list_files(self) -> List[str]:
         """List all files in the lockbox."""
@@ -606,14 +612,14 @@ class Lockbox:
         fmt = self._load_format()
 
         if not self.quiet:
-            print(f"Encrypted with key: {fmt.key_id}")
+            print(f"[GPMASTER:] Encrypted with key: {fmt.key_id}")
 
         success, secrets, dec_key = self._decrypt_data(fmt, retry=not self.quiet)
         if not success:
-            raise RuntimeError("Failed to decrypt lockbox")
+            raise RuntimeError("[GPMASTER:] Failed to decrypt lockbox")
 
         if not self.quiet:
-            print(f"Decrypted with key: {dec_key}")
+            print(f"[GPMASTER:] Decrypted with key: {dec_key}")
 
         if secret_key not in secrets:
             return None
